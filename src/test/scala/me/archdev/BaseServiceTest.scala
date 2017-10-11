@@ -1,34 +1,39 @@
 package me.archdev
 
+import akka.http.scaladsl.testkit.ScalatestRouteTest
+import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport
 import me.archdev.restapi.http.HttpService
-import me.archdev.restapi.models.{ TokenEntity, UserEntity }
-import me.archdev.restapi.utils.Migration
+import me.archdev.restapi.models.UserEntity
+import me.archdev.restapi.services.{AuthService, UsersService}
+import me.archdev.restapi.utils.DatabaseService
+import me.archdev.utils.InMemoryPostgresStorage._
 import org.scalatest._
 
-import akka.event.{ NoLogging, LoggingAdapter }
-import akka.http.scaladsl.testkit.ScalatestRouteTest
-
-import scala.concurrent.Await
 import scala.concurrent.duration._
+import scala.concurrent.{Await, Future}
+import scala.util.Random
 
-trait BaseServiceTest extends WordSpec with Matchers with ScalatestRouteTest with HttpService with Migration {
-  protected val log: LoggingAdapter = NoLogging
+trait BaseServiceTest extends WordSpec with Matchers with ScalatestRouteTest with FailFastCirceSupport {
 
-  import driver.api._
+  dbProcess.getProcessId
 
-  val testUsers = Seq(
-    UserEntity(Some(1), "Arhelmus", "test"),
-    UserEntity(Some(2), "Arch", "test"),
-    UserEntity(Some(3), "Hierarh", "test")
-  )
+  private val databaseService = new DatabaseService(jdbcUrl, dbUser, dbPassword)
 
-  val testTokens = Seq(
-    TokenEntity(userId = Some(1)),
-    TokenEntity(userId = Some(2)),
-    TokenEntity(userId = Some(3))
-  )
+  val usersService = new UsersService(databaseService)
+  val authService = new AuthService(databaseService)(usersService)
+  val httpService = new HttpService(usersService, authService)
 
-  reloadSchema()
-  Await.result(db.run(users ++= testUsers), 10.seconds)
-  Await.result(db.run(tokens ++= testTokens), 10.seconds)
+  def provisionUsersList(size: Int): Seq[UserEntity] = {
+    val savedUsers = (1 to size).map { _ =>
+      UserEntity(Some(Random.nextLong()), Random.nextString(10), Random.nextString(10))
+    }.map(usersService.createUser)
+
+    Await.result(Future.sequence(savedUsers), 10.seconds)
+  }
+
+  def provisionTokensForUsers(usersList: Seq[UserEntity]) = {
+    val savedTokens = usersList.map(authService.createToken)
+    Await.result(Future.sequence(savedTokens), 10.seconds)
+  }
+
 }

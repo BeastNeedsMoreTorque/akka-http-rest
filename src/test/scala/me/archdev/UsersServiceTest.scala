@@ -1,63 +1,84 @@
 package me.archdev
 
-import akka.http.scaladsl.model.{ HttpEntity, MediaTypes }
-import me.archdev.restapi.http.routes.UsersServiceRoute
+import akka.http.scaladsl.model.StatusCodes._
+import akka.http.scaladsl.model.{HttpEntity, MediaTypes}
+import io.circe.generic.auto._
 import me.archdev.restapi.models.UserEntity
 import org.scalatest.concurrent.ScalaFutures
 
-import spray.json._
-import akka.http.scaladsl.model.StatusCodes._
+import scala.util.Random
 
 class UsersServiceTest extends BaseServiceTest with ScalaFutures {
+
+  import usersService._
+
+  trait Context {
+    val testUsers = provisionUsersList(5)
+    val testTokens = provisionTokensForUsers(testUsers)
+    val route = httpService.usersRouter.route
+  }
+
   "Users service" should {
-    "retrieve users list" in {
-      Get("/users") ~> usersRoute ~> check {
-        responseAs[JsArray] should be(testUsers.toJson)
+
+    "retrieve users list" in new Context {
+      Get("/users") ~> route ~> check {
+        responseAs[Seq[UserEntity]].isEmpty should be(false)
       }
     }
 
-    "retrieve user by id" in {
-      Get("/users/1") ~> usersRoute ~> check {
-        responseAs[JsObject] should be(testUsers.head.toJson)
+    "retrieve user by id" in new Context {
+      val testUser = testUsers(4)
+      Get(s"/users/${testUser.id.get}") ~> route ~> check {
+        responseAs[UserEntity] should be(testUser)
       }
     }
 
-    "update user by id and retrieve it" in {
-      val newUsername = "UpdatedUsername"
-      val requestEntity = HttpEntity(MediaTypes.`application/json`, JsObject("username" -> JsString(newUsername)).toString())
-      Post("/users/1", requestEntity) ~> usersRoute ~> check {
-        responseAs[JsObject] should be(testUsers.head.copy(username = newUsername).toJson)
-        whenReady(getUserById(1)) { result =>
+    "update user by id and retrieve it" in new Context {
+      val testUser = testUsers(3)
+      val newUsername = Random.nextString(10)
+      val requestEntity = HttpEntity(MediaTypes.`application/json`, s"""{"username": "$newUsername"}""")
+
+      Post(s"/users/${testUser.id.get}", requestEntity) ~> route ~> check {
+        responseAs[UserEntity] should be(testUser.copy(username = newUsername))
+        whenReady(getUserById(testUser.id.get)) { result =>
           result.get.username should be(newUsername)
         }
       }
     }
 
-    "delete user" in {
-      Delete("/users/3") ~> usersRoute ~> check {
+    "delete user" in new Context {
+      val testUser = testUsers(2)
+      Delete(s"/users/${testUser.id.get}") ~> route ~> check {
         response.status should be(NoContent)
-        whenReady(getUserById(3)) { result =>
+        whenReady(getUserById(testUser.id.get)) { result =>
           result should be(None: Option[UserEntity])
         }
       }
     }
 
-    "retrieve currently logged user" in {
-      Get("/users/me") ~> addHeader("Token", testTokens.find(_.userId.contains(2)).get.token) ~> usersRoute ~> check {
-        responseAs[JsObject] should be(testUsers.find(_.id.contains(2)).get.toJson)
+    "retrieve currently logged user" in new Context {
+      val testUser = testUsers(1)
+      val header = "Token" -> testTokens.find(_.userId.contains(testUser.id.get)).get.token
+
+      Get("/users/me") ~> addHeader(header._1, header._2) ~> route ~> check {
+        responseAs[UserEntity] should be(testUsers.find(_.id.contains(testUser.id.get)).get)
       }
     }
 
-    "update currently logged user" in {
-      val newUsername = "MeUpdatedUsername"
-      val requestEntity = HttpEntity(MediaTypes.`application/json`, JsObject("username" -> JsString(newUsername)).toString())
-      Post("/users/me", requestEntity) ~> addHeader("Token", testTokens.find(_.userId.contains(2)).get.token) ~> usersRoute ~> check {
-        responseAs[JsObject] should be(testUsers.find(_.id.contains(2)).get.copy(username = newUsername).toJson)
-        whenReady(getUserById(2)) { result =>
+    "update currently logged user" in new Context {
+      val testUser = testUsers.head
+      val newUsername = Random.nextString(10)
+      val requestEntity = HttpEntity(MediaTypes.`application/json`, s"""{"username": "$newUsername"}""")
+      val header = "Token" -> testTokens.find(_.userId.contains(testUser.id.get)).get.token
+
+      Post("/users/me", requestEntity) ~> addHeader(header._1, header._2) ~> route ~> check {
+        responseAs[UserEntity] should be(testUsers.find(_.id.contains(testUser.id.get)).get.copy(username = newUsername))
+        whenReady(getUserById(testUser.id.get)) { result =>
           result.get.username should be(newUsername)
         }
       }
     }
+
   }
 
 }

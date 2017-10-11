@@ -15,11 +15,12 @@ Example contains complete REST service for entity interaction.
 * Test coverage with *ScalaTest*
 * Migrations with *FlyWay*
 * Ready for *Docker*
+* Testing with inmemory postgres instance that launch automaticly
+* *HikaryCP* as connection pool
 
 ## Requirements
-* JDK 7+ (e.g. [http://www.oracle.com/technetwork/java/javase/downloads/index.html](http://www.oracle.com/technetwork/java/javase/downloads/index.html));
+* JDK 8 (e.g. [http://www.oracle.com/technetwork/java/javase/downloads/index.html](http://www.oracle.com/technetwork/java/javase/downloads/index.html));
 * sbt ([http://www.scala-sbt.org/release/docs/Getting-Started/Setup.html](http://www.scala-sbt.org/release/docs/Getting-Started/Setup.html));
-* PostgreSQL server
 
 ## Activator 
 
@@ -29,15 +30,15 @@ step-by-step: [https://www.typesafe.com/activator/template/akka-http-rest](https
 
 ## Configuration
 * Create database in PostgresSQL 
-* Set database settings on application config or set enviroment variables
+* Set database settings on application config or set environment variables
 
 ### Changing application config
 There are two config files. Application config `src/main/resources/application.conf` and test config `src/test/resources/application.conf`.
 
-### Enviroment variables
-- `PSQL_URL` || `PSQL_TEST_URL` - database url by scheme `jdbc:postgresql://host:port/database-name`
-- `PSQL_USER` || `PSQL_TEST_USER` - database user
-- `PSQL_PASSWORD` || `PSQL_TEST_PASSWORD` - database password
+### Environment variables
+- `PSQL_URL` - database url by scheme `jdbc:postgresql://host:port/database-name`
+- `PSQL_USER` - database user
+- `PSQL_PASSWORD` - database password
 
 ## Run application
 To run application, call:
@@ -76,6 +77,8 @@ Application deployed on heroku and can be accessed by URL [http://akka-http-rest
 
 You can see documentation for this example on [Apiary](http://docs.akkahttprest.apiary.io).
 
+## Need more explanation?
+Great [blog article](http://www.bbartosz.com/blog/2015/12/14/akka-http-rest-api/) about how it works, thanks [@BBartosz](https://twitter.com/BBartosz91)!
 
 ## Copyright
 

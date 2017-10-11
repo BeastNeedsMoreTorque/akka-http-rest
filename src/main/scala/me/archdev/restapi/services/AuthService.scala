@@ -1,21 +1,19 @@
 package me.archdev.restapi.services
 
 import me.archdev.restapi.models.db.TokenEntityTable
-import me.archdev.restapi.models.{ TokenEntity, UserEntity }
-import org.mindrot.jbcrypt.BCrypt
+import me.archdev.restapi.models.{TokenEntity, UserEntity}
+import me.archdev.restapi.utils.DatabaseService
 
-import scala.concurrent.Future
-import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.{ExecutionContext, Future}
 
-object AuthService extends AuthService
+class AuthService(val databaseService: DatabaseService)(usersService: UsersService)(implicit executionContext: ExecutionContext) extends TokenEntityTable {
 
-trait AuthService extends TokenEntityTable {
-
-  import driver.api._
+  import databaseService._
+  import databaseService.profile.api._
 
   def signIn(login: String, password: String): Future[Option[TokenEntity]] = {
     db.run(users.filter(u => u.username === login).result).flatMap { users =>
-      users.find(user => BCrypt.checkpw(password, user.password)) match {
+      users.find(user => user.password == password) match {
         case Some(user) => db.run(tokens.filter(_.userId === user.id).result.headOption).flatMap {
           case Some(token) => Future.successful(Some(token))
           case None        => createToken(user).map(token => Some(token))
@@ -26,7 +24,7 @@ trait AuthService extends TokenEntityTable {
   }
 
   def signUp(newUser: UserEntity): Future[TokenEntity] = {
-    UsersService.createUser(newUser).flatMap(user => createToken(user))
+    usersService.createUser(newUser).flatMap(user => createToken(user))
   }
 
   def authenticate(token: String): Future[Option[UserEntity]] =

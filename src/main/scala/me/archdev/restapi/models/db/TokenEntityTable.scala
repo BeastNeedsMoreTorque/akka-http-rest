@@ -1,11 +1,12 @@
 package me.archdev.restapi.models.db
 
 import me.archdev.restapi.models.TokenEntity
-import me.archdev.restapi.utils.DatabaseConfig
+import me.archdev.restapi.utils.DatabaseService
 
-trait TokenEntityTable extends UserEntityTable with DatabaseConfig {
+trait TokenEntityTable extends UserEntityTable {
 
-  import driver.api._
+  protected val databaseService: DatabaseService
+  import databaseService.profile.api._
 
   class Tokens(tag: Tag) extends Table[TokenEntity](tag, "tokens") {
     def id = column[Option[Long]]("id", O.PrimaryKey, O.AutoInc)
